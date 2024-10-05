@@ -1,0 +1,42 @@
+name: Yaml linting
+
+on:
+  workflow_call:
+  push:
+
+jobs:
+  yaml-lint-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: files
+        uses: lots0logs/gh-action-get-changed-files@2.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: clubcedille/cedille-workflows
+          path: cedille-workflows
+          ref: main
+          sparse-checkout: |
+            .yamllint.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Lint YAML files
+        run: |
+          files=$(echo '${{ steps.files.outputs.all }}' | jq -r '.[]')
+          for file in $files; do
+            if [[ -f "$file" && ( $file == *.yml || $file == *.yaml ) ]]; then
+              yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" "$file"
+            fi
+          done
+        shell: bash

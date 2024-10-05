@@ -1,0 +1,45 @@
+
+name: Terraform lint workflow
+
+on:
+  workflow_call:
+
+jobs:
+  terraform-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: latest
+
+      - name: Terraform Initialization
+        run: terraform init
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive -diff
+
+      - uses: terraform-linters/setup-tflint@v3
+        name: Setup TFLint
+        with:
+          tflint_version: v0.53.0
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: clubcedille/cedille-workflows
+          path: cedille-workflows
+          ref: main
+          sparse-checkout: |
+            .tflint.hcl
+          sparse-checkout-cone-mode: false
+    
+      - name: Init TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: |
+            tflint --recursive --config "${{ github.workspace }}/cedille-workflows/.tflint.hcl"
