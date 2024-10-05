@@ -26,7 +26,7 @@ jobs:
         with:
           repository: clubcedille/cedille-workflows
           path: cedille-workflows
-          ref: main
+          ref: master
           sparse-checkout: |
             .yamllint.yml
           sparse-checkout-cone-mode: false
