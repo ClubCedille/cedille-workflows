@@ -1,4 +1,3 @@
-
 name: Terraform lint workflow
 
 on:
@@ -36,7 +35,7 @@ jobs:
           sparse-checkout: |
             .tflint.hcl
           sparse-checkout-cone-mode: false
-    
+
       - name: Init TFLint
         run: tflint --init
 
