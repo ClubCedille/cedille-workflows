@@ -17,7 +17,7 @@ on:
       push-latest:
         required: false
         type: boolean
-        default: false 
+        default: false
 
 env:
   REGISTRY: ghcr.io/clubcedille
