@@ -6,9 +6,14 @@ on:
             container-name:
                 required: true
                 type: string
-            tag:
+            context:
                 required: true
                 type: string
+                default: '.'
+            file:
+                required: false
+                type: string
+                default: 'Dockerfile'
 
 env:
     REGISTRY: ghcr.io/clubcedille
@@ -30,6 +35,15 @@ jobs:
               username: ${{ github.actor }}
               password: ${{ secrets.GITHUB_TOKEN }}
     
+          - name: Determine Docker tag
+            id: determine-tag
+            run: |
+              if [ "${{ github.event_name }}" == "pull_request" ]; then
+                echo "TAG=${{ github.head_ref }}" >> $GITHUB_ENV
+              else
+                echo "TAG=commit-${{ github.sha }}" >> $GITHUB_ENV
+              fi
+    
           - name: Cache Docker layers
             uses: actions/cache@v3
             with:
@@ -41,10 +55,11 @@ jobs:
           - name: Build and push
             uses: docker/build-push-action@v2
             with:
-              context: .
+              context: ${{ inputs.context }}
+              file: ${{ inputs.file }}
               push: true
               tags: |
-                ${{ env.REGISTRY }}/${{ inputs.container-name }}:${{ inputs.tag }}
+                ${{ env.REGISTRY }}/${{ inputs.container-name }}:${{ env.TAG }}
                 ${{ env.REGISTRY }}/${{ inputs.container-name }}:latest
               cache-from: type=local,src=/tmp/.buildx-cache
               cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
