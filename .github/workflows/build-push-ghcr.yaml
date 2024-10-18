@@ -14,6 +14,10 @@ on:
         required: false
         type: string
         default: 'Dockerfile'
+      push-latest:
+        required: false
+        type: boolean
+        default: false 
 
 env:
   REGISTRY: ghcr.io/clubcedille
@@ -58,9 +62,10 @@ jobs:
           context: ${{ inputs.context }}
           file: ${{ inputs.file }}
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.REGISTRY }}/${{ inputs.container-name }}:${{ env.TAG }}
-            ${{ env.REGISTRY }}/${{ inputs.container-name }}:latest
+            ${{ inputs.push-latest && format('${{ env.REGISTRY }}/${{ inputs.container-name }}:latest') }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 
