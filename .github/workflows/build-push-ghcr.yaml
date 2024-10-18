@@ -39,7 +39,9 @@ jobs:
         id: determine-tag
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "TAG=${{ github.head_ref }}" >> $GITHUB_ENV
+            # Clean up branch name by replacing non-alphanumeric characters with hyphens
+            CLEANED_TAG=$(echo "${{ github.head_ref }}" | sed 's/[^a-zA-Z0-9]/-/g')
+            echo "TAG=$CLEANED_TAG" >> $GITHUB_ENV
           else
             echo "TAG=commit-${{ github.sha }}" >> $GITHUB_ENV
           fi
@@ -58,6 +60,7 @@ jobs:
           context: ${{ inputs.context }}
           file: ${{ inputs.file }}
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.REGISTRY }}/${{ inputs.container-name }}:${{ env.TAG }}
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -70,6 +73,7 @@ jobs:
           context: ${{ inputs.context }}
           file: ${{ inputs.file }}
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.REGISTRY }}/${{ inputs.container-name }}:latest
           cache-from: type=local,src=/tmp/.buildx-cache
