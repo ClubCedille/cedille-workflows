@@ -53,7 +53,7 @@ jobs:
             ${{ runner.os }}-buildx-
 
       - name: Build and push (Commit/PR tag)
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.file }}
@@ -65,7 +65,7 @@ jobs:
 
       - name: Build and push (Latest tag if on main)
         if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.file }}
