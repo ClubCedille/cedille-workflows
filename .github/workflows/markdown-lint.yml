@@ -28,7 +28,7 @@ jobs:
           config-file: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
 
       - name: Run markdown lint
-        uses: DavidAnson/markdownlint-cli2-action@v14
+        uses: DavidAnson/markdownlint-cli2-action@v18
         if: always()
         with:
           globs: '**/*.md'
