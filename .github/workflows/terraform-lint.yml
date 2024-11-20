@@ -27,7 +27,7 @@ jobs:
         run: terraform fmt -check -recursive -diff
         continue-on-error: true
 
-      - uses: terraform-linters/setup-tflint@v3
+      - uses: terraform-linters/setup-tflint@v4
         name: Setup TFLint
         with:
           tflint_version: v0.53.0
