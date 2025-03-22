@@ -1,19 +1,35 @@
-# Based on https://github.com/kubernetes-sigs/kubespray
-extends: default
+# https://github.com/ContainerSolutions/kubernetes-examples/blob/master/.yamllint
+yaml-files:
+  - '*.yaml'
+  - '*.yml'
+  - '.yamllint'
+
 ignore: |
-  .git/
+  .github/
+
 rules:
-  braces:
-    min-spaces-inside: 0
-    max-spaces-inside: 1
-  brackets:
-    min-spaces-inside: 0
-    max-spaces-inside: 1
-  indentation:
-    spaces: 2
-    indent-sequences: consistent
+  braces: enable
+  brackets: enable
+  colons: enable
+  commas: enable
+  comments:
+    level: warning
+  comments-indentation:
+    level: warning
+  document-end: disable
+  document-start:
+    level: warning
+  empty-lines: enable
+  empty-values: disable
+  hyphens: enable
+  indentation: enable
+  key-duplicates: enable
+  key-ordering: disable
   line-length: disable
-  new-line-at-end-of-file: disable
-  truthy: disable
-  document-start: false
-  comments-indentation: false
+  new-line-at-end-of-file: enable
+  new-lines: enable
+  octal-values: disable
+  quoted-strings: disable
+  trailing-spaces: enable
+  truthy:
+    level: warning
