@@ -10,7 +10,7 @@ jobs:
 
   yaml-check:
     uses:
-      clubcedille/cedille-workflows/.github/workflows/yaml-lint.yml@master
+      clubcedille/cedille-workflows/.github/workflows/yaml-lint.yml@alexvegas22-yamllint
 
   terraform-check:
     uses:
