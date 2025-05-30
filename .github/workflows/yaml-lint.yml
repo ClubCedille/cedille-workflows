@@ -37,5 +37,7 @@ jobs:
               yaml_files+=("$file")  # Add to the new list
             fi
           done
-          yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" $yaml_files
+          if [ ${#yaml_files[@]} -gt 0 ]; then
+            yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" $yaml_files
+          fi
         shell: bash
