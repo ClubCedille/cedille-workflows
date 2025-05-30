@@ -34,6 +34,7 @@ jobs:
       - name: Lint YAML files
         run: |
           files=$(echo '${{ steps.files.outputs.all }}' | jq -r '.[]')
+          yaml_files=()
           for file in "${files[@]}"; do
             if [[ -f "$file" && ( "$file" == *.yml || "$file" == *.yaml ) ]]; then
               yaml_files+=("$file")  # Add to the new list
