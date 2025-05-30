@@ -34,7 +34,7 @@ jobs:
           yaml_files=()
           for file in "${files[@]}"; do
             if [[ -f "$file" && ( "$file" == *.yml || "$file" == *.yaml ) ]]; then
-              yaml_files+=("$file")  # Add to the new list
+              yaml_files+=("$file")
             fi
           done
           if [ ${#yaml_files[@]} -gt 0 ]; then
