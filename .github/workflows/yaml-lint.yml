@@ -38,5 +38,6 @@ jobs:
             if [[ -f "$file" && ( $file == *.yml || $file == *.yaml ) ]]; then
               yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" $file
             fi
+            test
           done
         shell: bash
