@@ -30,9 +30,9 @@ jobs:
 
       - name: Lint YAML files
         run: |
-          files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}' | jq -r '.[]')
+          files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')
           yaml_files=()
-          for file in "${files[@]}"; do
+          for file in $files; do
             if [[ -f "$file" && ( "$file" == *.yml || "$file" == *.yaml ) ]]; then
               yaml_files+=("$file")
             fi
