@@ -3,6 +3,12 @@ name: Yaml linting
 on:
   workflow_call:
   push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - synchronize
 
 jobs:
   yaml-lint-check:
