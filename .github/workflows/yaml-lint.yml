@@ -37,7 +37,7 @@ jobs:
               yaml_files+=("$file")
             fi
           done
-          if [ $yaml_files -gt 0 ]; then
+          if [ ${#yaml_files[@]} -gt 0 ]; then
             yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" $yaml_files
           fi
         shell: bash
