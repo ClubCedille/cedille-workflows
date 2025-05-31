@@ -44,7 +44,7 @@ jobs:
             fi
           done
           if [ ${#yaml_files[@]} -gt 0 ]; then
-            yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" $yaml_files
+            yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" "${yaml_files[@]}"
           else
             echo 'No yaml files'
           fi
