@@ -3,6 +3,12 @@ name: Yaml linting
 on:
   workflow_call:
   push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - synchronize
 
 jobs:
   yaml-lint-check:
@@ -10,13 +16,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+  
       - name: Get changed files
-        id: files
-        uses: lots0logs/gh-action-get-changed-files@2.2.2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
+        id: changed-files
+        uses: tj-actions/changed-files@ed68ef82c095e0d48ec87eccea555d944a631a4c
 
       - name: Install yamllint
         run: pip install yamllint
@@ -33,10 +36,14 @@ jobs:
 
       - name: Lint YAML files
         run: |
-          files=$(echo '${{ steps.files.outputs.all }}' | jq -r '.[]')
+          files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}')
+          yaml_files=()
           for file in $files; do
-            if [[ -f "$file" && ( $file == *.yml || $file == *.yaml ) ]]; then
-              yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" $file
+            if [[ -f "$file" && ( "$file" == *.yml || "$file" == *.yaml ) ]]; then
+              yaml_files+=("$file")
             fi
           done
+          if [ ${#yaml_files[@]} -gt 0 ]; then
+            yamllint -c "${{ github.workspace }}/cedille-workflows/.yamllint.yml" "${yaml_files[@]}"
+          fi
         shell: bash
