@@ -22,14 +22,14 @@ jobs:
             .mlc_config.json
           sparse-checkout-cone-mode: false
 
-      - name: Validating links
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
-        with:
-          config-file: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
-
       - name: Run markdown lint
         uses: DavidAnson/markdownlint-cli2-action@v20
         if: always()
         with:
           globs: '**/*.md'
           config: ${{ github.workspace }}/cedille-workflows/.markdownlint.json
+      
+      - name: Validating links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          config-file: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
