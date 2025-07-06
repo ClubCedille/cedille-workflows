@@ -8,9 +8,6 @@ jobs:
   markdown-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Checkout default configs
         uses: actions/checkout@v4
         with:
