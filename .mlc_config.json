@@ -1,6 +1,5 @@
 {
     "aliveStatusCodes": [999,200,403],
-    "use-quiet-mode": true,
     "ignorePatterns": [
         {
             "pattern": "^http://localhost"
