@@ -32,4 +32,4 @@ jobs:
       - name: Validating links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
-          config-file: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
+          config-file: ./cedille-workflows/.mlc_config.json
