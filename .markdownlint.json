@@ -10,5 +10,8 @@
     "MD031": {
         "list_items": false
     },
-    "MD029": false
+    "MD029": false,
+    "MD010": {
+        "code_blocks": false
+    }
 }
