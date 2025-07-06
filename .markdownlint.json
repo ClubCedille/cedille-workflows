@@ -6,8 +6,11 @@
     },
     "MD033": {
         "allowed_elements": ["details", "summary"]
-  },
+    },
     "MD031": {
         "list_items": false
+    },
+    "MD029": {
+        "style": "ordered"
     }
 }
