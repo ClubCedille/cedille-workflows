@@ -29,4 +29,6 @@ jobs:
       - name: Validating links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
-          config: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
+          use-quiet-mode: true
+          config-file: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
+          
