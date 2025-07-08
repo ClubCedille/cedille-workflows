@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Checkout default configs
         uses: actions/checkout@v4
         with:
@@ -22,6 +22,15 @@ jobs:
             .mlc_config.json
           sparse-checkout-cone-mode: false
 
+      - name: Set config path
+        id: config_path
+        run: |
+          if [ "${{ steps.mlc_check.outputs.found }}" = "true" ]; then
+            echo "config_path=${GITHUB_WORKSPACE}/.mlc_config.json" >> $GITHUB_OUTPUT
+          else
+            echo "config_path=${GITHUB_WORKSPACE}/cedille-workflows/.mlc_config.json" >> $GITHUB_OUTPUT
+          fi
+        
       - name: Run markdown lint
         uses: DavidAnson/markdownlint-cli2-action@v20
         if: always()
@@ -33,5 +42,4 @@ jobs:
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
           use-quiet-mode: true
-          config-file: ${{ github.workspace }}/cedille-workflows/.mlc_config.json
-          
+          config-file: ${{ steps.config_path.outputs.config_path }}
