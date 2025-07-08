@@ -2,6 +2,13 @@ name: Markdown lint
 
 on:
   workflow_call:
+    inputs:
+      md-link-config-file-path:
+        required: false
+        type: string
+      md-lint-config-file-path:
+        required: false
+        type: string
   push:
 
 jobs:
@@ -12,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Checkout default configs
+        if: inputs.md-link-config-file-path == '' || inputs.md-lint-config-file-path == ''
         uses: actions/checkout@v4
         with:
           repository: clubcedille/cedille-workflows
@@ -22,24 +30,33 @@ jobs:
             .mlc_config.json
           sparse-checkout-cone-mode: false
 
-      - name: Set config path
-        id: config_path
+
+      - name: Determine markdown link config file
+        id: linkconfig
         run: |
-          if [ "${{ steps.mlc_check.outputs.found }}" = "true" ]; then
-            echo "config_path=${GITHUB_WORKSPACE}/.mlc_config.json" >> $GITHUB_OUTPUT
+          if [ -z "${{ inputs.md-link-config-file-path }}" ]; then
+            echo "::set-output name=link_config_path::github-workflows/.mlc_config.json"
           else
-            echo "config_path=${GITHUB_WORKSPACE}/cedille-workflows/.mlc_config.json" >> $GITHUB_OUTPUT
+            echo "::set-output name=link_config_path::${{ inputs.md-link-config-file-path }}"
           fi
-        
+
+      - name: Determine markdown lint config file
+        id: lintconfig
+        run: |
+          if [ -z "${{ inputs.md-lint-config-file-path }}" ]; then
+            echo "::set-output name=lint_config_path::github-workflows/.markdownlint.json"
+          else
+            echo "::set-output name=lint_config_path::${{ inputs.md-lint-config-file-path }}"
+          fi
+
       - name: Run markdown lint
         uses: DavidAnson/markdownlint-cli2-action@v20
         if: always()
         with:
           globs: '**/*.md'
-          config: ${{ github.workspace }}/cedille-workflows/.markdownlint.json
-      
+          config: ${{ github.workspace }}/${{ steps.lintconfig.outputs.lint_config_path }}      
       - name: Validating links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
           use-quiet-mode: true
-          config-file: ${{ steps.config_path.outputs.config_path }}
+          config-file: ${{ steps.linkconfig.outputs.link_config_path }}
