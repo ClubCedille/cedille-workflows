@@ -48,7 +48,6 @@ jobs:
             type=sha
             type=raw,value=${{ inputs.branch }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=raw,value=staging,enable=${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
         
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
