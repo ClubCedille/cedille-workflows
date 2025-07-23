@@ -9,9 +9,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: azure/setup-kubectl@v4
         id: install-kubectl
 
@@ -24,9 +21,10 @@ jobs:
         id: changed-files
         uses: tj-actions/changed-files@cf79a64fed8a943fb1073260883d08fe0dfb4e56
 
-        with:
-          base_sha: ${{ github.event.pull_request.base.sha }}
-          sha:      ${{ github.event.pull_request.head.sha }}
+
+      - run: |
+          echo "Changed files detected:"
+          printf '%s\n' "${{ steps.changed-files.outputs.all_changed_files }}"
 
       - name: Build overlays for changed kustomizations
         env:
