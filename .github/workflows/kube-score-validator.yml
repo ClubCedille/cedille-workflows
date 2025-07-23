@@ -28,8 +28,6 @@ jobs:
           mkdir -p "$out_dir"
 
           changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
-
-          # 2) Remettre un fichier par ligne
           to_rebuild=$(echo "$changed_files" | tr ' ' '\n' |
                       awk -F/ '/^apps\// {print $1"/"$2}' |
                       sort -u)
@@ -37,7 +35,6 @@ jobs:
           echo "Apps to rebuild:"; printf '  %s\n' $to_rebuild
           echo "-----------------------------------------"
 
-          # Build only changed kustomizations
           roots=()
           for d in apps bases system common; do
             [ -d "$d" ] && roots+=("./$d")
