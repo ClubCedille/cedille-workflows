@@ -1,0 +1,102 @@
+name: kube-score workflow
+
+on:
+  workflow_call:
+
+jobs:
+  kube-score:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+        id: install-kubectl
+
+      - name: Install kube-score
+        run: |
+          kubectl krew install score
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@cf79a64fed8a943fb1073260883d08fe0dfb4e56
+
+      - name: Build overlays for changed kustomizations
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          out_dir="out/kustomize"
+          mkdir -p "$out_dir"
+
+          # Scan every tree that contains a kustomization.yaml
+          find ./apps ./bases -type f -name kustomization.yaml -not -path '*/base/*' -print0 |
+          while IFS= read -r -d '' kustom; do
+            dir="$(dirname "$kustom")"
+            rel="${dir#./}"
+
+            #‑‑ test if *at least one* changed file lives inside that directory
+            if printf '%s\n' "$CHANGED_FILES" | grep -qE "^${rel}(/|$)"; then
+              name="${rel//\//_}.yaml"
+              echo "▶ building $name"
+              kubectl kustomize --enable-helm "$dir" > "$out_dir/$name"
+            fi
+          done
+
+      - name: kube‑score check
+        id: score
+        run: |
+          kube-score score --output-format ci ./out/kustomize/*.yaml | tee /tmp/kube-score.ci
+
+
+      # - name: kube-score check (Kustomize)
+      #   uses: piraces/kube-score-ga@v0.1.3
+      #   with:
+      #     manifests-folders: './out/kustomize/*.yaml'
+      #     ignore-exit-code: true
+
+      - name: Collect /kube-score skip directives
+        if: github.event_name == 'pull_request'
+        id: skips
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json body,comments --jq '
+            ([.body] + [.comments[].body])
+            | map( split("\n")[] )
+            | map( select(startswith("/kube-score skip ")) )
+            | unique
+            | .[]'
+          > /tmp/kskip.list || true
+
+      - name: Validate kube-score results
+        shell: bash
+        run: |
+          sk=$(sed -E 's%^/kube-score skip %%' /tmp/kskip.list | sort -u)
+          echo "Skip list detected:"; printf '  - %s\n' $sk || true
+          echo "----------------------------------------"
+
+          # Extract CRITICAL objects from kube-score CI output
+          crit=$(sed -nE 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\2 \1/p' /tmp/kube-score.ci | sort -u)
+
+          failures=0
+          for obj in $crit; do
+            if grep -Fxq "$obj" <<< "$sk"; then
+              echo "⏭  $obj  (skipped)"
+            else
+              echo "::error::$obj failed kube‑score"
+              failures=1
+            fi
+          done
+
+          if [ "$failures" -ne 0 ]; then
+            echo
+            echo "❌  Unresolved CRITICAL findings detected."
+            echo "💡  To waive a specific object, add a PR comment line like:"
+            echo "    /kube-score skip <apiVersion>/<Kind> <name>"
+            echo "    e.g.  /kube-score skip apps/v1/Deployment synapsets-web"
+            exit 1
+          fi
+          
+          echo "✅  All CRITICAL findings fixed or explicitly skipped"
