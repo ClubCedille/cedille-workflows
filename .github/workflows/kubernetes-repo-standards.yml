@@ -6,7 +6,7 @@ on:
 jobs:
   kubescore-check:
     uses:
-      clubcedille/cedille-workflows/.github/workflows/kube-score.yml@master
+      clubcedille/cedille-workflows/.github/workflows/kube-score-validator.yml@master
 
   yaml-check:
     uses:

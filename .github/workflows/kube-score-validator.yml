@@ -1,0 +1,115 @@
+name: kube-score validator workflow
+# Works only with pull request triggers
+on:
+  workflow_call:
+
+jobs:
+  kube-score:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+        id: install-kubectl
+
+      - name: Install kube-score
+        run: |
+          curl -sSL https://github.com/zegl/kube-score/releases/download/v1.20.0/kube-score_1.20.0_linux_amd64 -o /usr/local/bin/kube-score
+          chmod +x /usr/local/bin/kube-score
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@cf79a64fed8a943fb1073260883d08fe0dfb4e56
+
+      - name: Build overlays for changed kustomizations
+        run: |
+          set -euo pipefail
+          out_dir="out/kustomize"
+          mkdir -p "$out_dir"
+
+          changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
+
+          # 2) Remettre un fichier par ligne
+          to_rebuild=$(echo "$changed_files" | tr ' ' '\n' |
+                      awk -F/ '/^apps\// {print $1"/"$2}' |
+                      sort -u)
+
+          echo "Apps to rebuild:"; printf '  %s\n' $to_rebuild
+          echo "-----------------------------------------"
+
+          find ./apps ./bases -type f -name kustomization.yaml -not -path '*/base/*' -print0 |
+          while IFS= read -r -d '' kustom; do
+            dir="$(dirname "$kustom")"
+            rel="${dir#./}"
+
+            if [[ $rel == apps/*/* ]]; then
+              app_root=$(echo "$rel" | cut -d'/' -f1-2)
+            else
+              app_root=${rel%%/*}
+            fi
+
+            if grep -Fxq "$app_root" <<< "$to_rebuild"; then
+              name="${rel//\//_}.yaml"
+              echo "▶ building $name"
+              kubectl kustomize --enable-helm "$dir" > "$out_dir/$name"
+            else
+              echo "⏭ $rel (unchanged)"
+            fi
+          done
+
+          echo "---- Resulting manifests ----"
+          ls -l "$out_dir" || true
+
+
+      - name: kube‑score check
+        id: score
+        run: |
+          kube-score score --output-format ci ./out/kustomize/*.yaml | tee /tmp/kube-score.ci
+
+      - name: Collect /kube-score skip directives
+        id: skips
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json body,comments --jq '
+            ([.body] + [.comments[].body])
+            | map(split("\n")[])
+            | map(select(startswith("/kube-score skip ")))
+            | unique
+            | .[]
+          ' > /tmp/kskip.list || true
+
+          echo "Skip directives found:"
+          cat /tmp/kskip.list || echo "(none)"
+
+      - name: Validate kube‑score results
+        shell: bash
+        run: |
+          sk=$(sed -E 's%^/kube-score skip %%; s/\r$//' /tmp/kskip.list | sort -u)
+
+          critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
+          failures=0
+
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+
+            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
+
+            if grep -Fxq "$key" <<< "$sk"; then
+              echo "⏭  $key (skipped)"
+            else
+              echo "::error::$line"
+              echo "↳  Pour ignorer : /kube-score skip $key"
+              failures=1
+            fi
+          done <<< "$critical_lines"
+
+          if [ "$failures" -ne 0 ]; then
+            echo
+            echo "❌  des findings CRITICAL sont encore présents."
+            exit 1
+          fi
+
+          echo "✅  Tous les findings CRITICAL sont corrigés ou explicitement skip."
