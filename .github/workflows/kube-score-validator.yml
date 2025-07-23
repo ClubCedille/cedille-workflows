@@ -40,9 +40,14 @@ jobs:
 
           find ./apps ./bases -type f -name kustomization.yaml -not -path '*/base/*' -print0 |
           while IFS= read -r -d '' kustom; do
-            dir="$(dirname "$kustom")"              # ./apps/crabe/prod
-            rel="${dir#./}"                         # apps/crabe/prod
-            app_root=${rel%/*/*}                    # apps/crabe
+            dir="$(dirname "$kustom")"          # ./apps/crabe/prod
+            rel="${dir#./}"                     # apps/crabe/prod
+
+            if [[ $rel == apps/*/* ]]; then
+              app_root=$(echo "$rel" | cut -d'/' -f1-2)   # apps/crabe
+            else
+              app_root=${rel%%/*}                         # bases
+            fi
 
             if grep -Fxq "$app_root" <<< "$to_rebuild"; then
               name="${rel//\//_}.yaml"
@@ -52,6 +57,7 @@ jobs:
               echo "⏭ $rel (unchanged)"
             fi
           done
+
 
           echo "---- Resulting manifests ----"
           ls -l "$out_dir" || true
