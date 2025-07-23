@@ -87,7 +87,7 @@ jobs:
       - name: Validate kube‑score results
         shell: bash
         run: |
-          sk=$(sed -E 's%^/kube-score skip %%' /tmp/kskip.list | sort -u)
+          sk=$(sed -E 's%^/kube-score skip %%; s/\r$//' /tmp/kskip.list | sort -u)
 
           critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
           failures=0
@@ -95,8 +95,7 @@ jobs:
           while IFS= read -r line; do
             [ -z "$line" ] && continue
 
-            # Clef "<name> <apiVersion/Kind>"
-            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line")
+            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
 
             if grep -Fxq "$key" <<< "$sk"; then
               echo "⏭  $key (skipped)"
@@ -107,9 +106,6 @@ jobs:
             fi
           done <<< "$critical_lines"
 
-          #─────────────────────────────────────────
-          # 3) Sortie
-          #─────────────────────────────────────────
           if [ "$failures" -ne 0 ]; then
             echo
             echo "❌  Des findings CRITICAL restent non résolus."
