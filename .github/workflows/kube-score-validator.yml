@@ -90,13 +90,14 @@ jobs:
           echo "Skip list detected:"; printf '  - %s\n' $sk || true
           echo "----------------------------------------"
 
-          failures=0
+          critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
 
-          grep '^\[CRITICAL\]' /tmp/kube-score.ci |
+          failures=0
           while IFS= read -r line; do
-            name=$(echo "$line" | awk '{print $2}')
-            kind=$(echo "$line" | awk '{print $3}')
-            key="$kind $name"
+            [ -z "$line" ] && continue   # ignore les lignes vides
+
+            # clé unique "apiVersion/Kind name"
+            key=$(awk '{print $3" "$2}' <<< "$line")
 
             if grep -Fxq "$key" <<< "$sk"; then
               echo "⏭  $key (skipped)"
@@ -104,7 +105,7 @@ jobs:
               echo "::error::$line"
               failures=1
             fi
-          done
+          done <<< "$critical_lines"
 
           if [ "$failures" -ne 0 ]; then
             echo
