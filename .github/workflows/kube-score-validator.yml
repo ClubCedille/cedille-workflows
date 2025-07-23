@@ -15,7 +15,8 @@ jobs:
 
       - name: Install kube-score
         run: |
-          kubectl krew install score
+          curl -sSL https://github.com/zegl/kube-score/releases/download/v1.20.0/kube-score_1.20.0_linux_amd64 -o /usr/local/bin/kube-score
+          chmod +x /usr/local/bin/kube-score
 
       - name: Get changed files
         id: changed-files
@@ -55,7 +56,6 @@ jobs:
       #     ignore-exit-code: true
 
       - name: Collect /kube-score skip directives
-        if: github.event_name == 'pull_request'
         id: skips
         shell: bash
         env:
@@ -98,5 +98,5 @@ jobs:
             echo "    e.g.  /kube-score skip apps/v1/Deployment synapsets-web"
             exit 1
           fi
-          
+
           echo "✅  All CRITICAL findings fixed or explicitly skipped"
