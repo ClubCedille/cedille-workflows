@@ -89,17 +89,18 @@ jobs:
         shell: bash
         run: |
           sk=$(sed -E 's%^/kube-score skip %%' /tmp/kskip.list | sort -u)
-          echo "Skip list detected:"; printf '  - %s\n' $sk || true
+          echo "Skip list detected:"
+          printf '  - %s\n' $sk || true
           echo "----------------------------------------"
 
           critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
 
           failures=0
           while IFS= read -r line; do
-            [ -z "$line" ] && continue   # ignore les lignes vides
+            [ -z "$line" ] && continue
 
-            # clé unique "apiVersion/Kind name"
-            key=$(awk '{print $3" "$2}' <<< "$line")
+            # Clef normalisée "<apiVersion/Kind> <name>"
+            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\2 \1/' <<< "$line")
 
             if grep -Fxq "$key" <<< "$sk"; then
               echo "⏭  $key (skipped)"
@@ -119,3 +120,4 @@ jobs:
           fi
 
           echo "✅  All CRITICAL findings fixed or explicitly skipped"
+
