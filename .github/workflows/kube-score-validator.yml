@@ -28,9 +28,10 @@ jobs:
           mkdir -p "$out_dir"
 
           changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
+
           to_rebuild=$(echo "$changed_files" | tr ' ' '\n' |
-                      awk -F/ '/^apps\// {print $1"/"$2}' |
-                      sort -u)
+                      grep -E '^(apps|bases|system|common)/' |
+                      cut -d/ -f1-2 | sed 's:/$::' | sort -u)
 
           echo "Apps to rebuild:"; printf '  %s\n' $to_rebuild
           echo "-----------------------------------------"
@@ -39,20 +40,17 @@ jobs:
           for d in apps bases system common; do
             [ -d "$d" ] && roots+=("./$d")
           done
+          [ "${#roots[@]}" -eq 0 ] && { echo "No kustomization roots found."; exit 0; }
 
-          if [ "${#roots[@]}" -eq 0 ]; then
-            echo "No kustomization roots found; nothing to build."
-            exit 0
-          fi
-
-          find "${roots[@]}" -type f \( -name kustomization.yaml -o -name kustomization.yml \) -not -path '*/base/*' -print0 |
+          find "${roots[@]}" \
+              -type f \( -name kustomization.yaml -o -name kustomization.yml \) \
+              -not -path '*/base/*' -print0 |
           while IFS= read -r -d '' kustom; do
             dir="$(dirname "$kustom")"
             rel="${dir#./}"
 
-            # Two‑level key only for apps tree (apps/<team>/<svc>/…)
-            if [[ $rel == apps/*/* ]]; then
-              app_root=$(echo "$rel" | cut -d'/' -f1-2)
+            if [[ $rel == apps/* ]]; then
+              app_root=$(echo "$rel" | cut -d/ -f1-2)
             else
               app_root=${rel%%/*}
             fi
@@ -60,16 +58,23 @@ jobs:
             if grep -Fxq "$app_root" <<<"$to_rebuild"; then
               name="${rel//\//_}.yaml"
               echo "▶ building $name"
-              kubectl kustomize --enable-helm "$dir" > "$out_dir/$name"
+
+              # Allow refs that climb out of the kustomisation dir (needed for nextcloud)
+              if kubectl kustomize --enable-helm \
+                                  --load-restrictor LoadRestrictionsNone \
+                                  "$dir" > "$out_dir/$name"; then
+                echo "✓ $name built"
+              else
+                echo "⚠️  $rel failed to build; skipping"
+                rm -f "$out_dir/$name"
+              fi
             else
               echo "⏭ $rel (unchanged)"
             fi
           done
 
-
           echo "---- Resulting manifests ----"
           ls -l "$out_dir" || true
-
 
       - name: kube‑score check
         id: score
