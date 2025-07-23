@@ -1,5 +1,5 @@
-name: kube-score workflow
-
+name: kube-score validator workflow
+# Works only with pull request triggers
 on:
   workflow_call:
 
