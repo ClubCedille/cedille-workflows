@@ -28,8 +28,6 @@ jobs:
           mkdir -p "$out_dir"
 
           changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
-
-          # 2) Remettre un fichier par ligne
           to_rebuild=$(echo "$changed_files" | tr ' ' '\n' |
                       awk -F/ '/^apps\// {print $1"/"$2}' |
                       sort -u)
@@ -37,18 +35,29 @@ jobs:
           echo "Apps to rebuild:"; printf '  %s\n' $to_rebuild
           echo "-----------------------------------------"
 
-          find ./apps ./bases -type f -name kustomization.yaml -not -path '*/base/*' -print0 |
+          roots=()
+          for d in apps bases system common; do
+            [ -d "$d" ] && roots+=("./$d")
+          done
+
+          if [ "${#roots[@]}" -eq 0 ]; then
+            echo "No kustomization roots found; nothing to build."
+            exit 0
+          fi
+
+          find "${roots[@]}" -type f \( -name kustomization.yaml -o -name kustomization.yml \) -not -path '*/base/*' -print0 |
           while IFS= read -r -d '' kustom; do
             dir="$(dirname "$kustom")"
             rel="${dir#./}"
 
+            # Two‑level key only for apps tree (apps/<team>/<svc>/…)
             if [[ $rel == apps/*/* ]]; then
               app_root=$(echo "$rel" | cut -d'/' -f1-2)
             else
               app_root=${rel%%/*}
             fi
 
-            if grep -Fxq "$app_root" <<< "$to_rebuild"; then
+            if grep -Fxq "$app_root" <<<"$to_rebuild"; then
               name="${rel//\//_}.yaml"
               echo "▶ building $name"
               kubectl kustomize --enable-helm "$dir" > "$out_dir/$name"
@@ -56,6 +65,7 @@ jobs:
               echo "⏭ $rel (unchanged)"
             fi
           done
+
 
           echo "---- Resulting manifests ----"
           ls -l "$out_dir" || true
