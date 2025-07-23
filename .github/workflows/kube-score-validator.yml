@@ -21,21 +21,16 @@ jobs:
         id: changed-files
         uses: tj-actions/changed-files@cf79a64fed8a943fb1073260883d08fe0dfb4e56
 
-
-      - run: |
-          echo "Changed files detected:"
-          printf '%s\n' "${{ steps.changed-files.outputs.all_changed_files }}"
-
       - name: Build overlays for changed kustomizations
-        env:
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
           set -euo pipefail
           out_dir="out/kustomize"
           mkdir -p "$out_dir"
 
-          # 1) liste unique des apps touchées -> apps/<app>
-          to_rebuild=$(printf '%s\n' "$CHANGED_FILES" |
+          changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
+
+          # 2) Remettre un fichier par ligne
+          to_rebuild=$(echo "$changed_files" | tr ' ' '\n' |
                       awk -F/ '/^apps\// {print $1"/"$2}' |
                       sort -u)
 
@@ -64,6 +59,7 @@ jobs:
 
           echo "---- Resulting manifests ----"
           ls -l "$out_dir" || true
+
 
       - name: kube‑score check
         id: score
