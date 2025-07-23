@@ -84,40 +84,36 @@ jobs:
           echo "Skip directives found:"
           cat /tmp/kskip.list || echo "(none)"
 
-
       - name: Validate kube‑score results
         shell: bash
         run: |
           sk=$(sed -E 's%^/kube-score skip %%' /tmp/kskip.list | sort -u)
-          echo "Skip list detected:"
-          printf '  - %s\n' $sk || true
-          echo "----------------------------------------"
 
           critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
-
           failures=0
+
           while IFS= read -r line; do
             [ -z "$line" ] && continue
 
-            # Clef normalisée "<apiVersion/Kind> <name>"
-            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\2 \1/' <<< "$line")
+            # Clef "<name> <apiVersion/Kind>"
+            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line")
 
             if grep -Fxq "$key" <<< "$sk"; then
               echo "⏭  $key (skipped)"
             else
               echo "::error::$line"
+              echo "↳  Pour ignorer : /kube-score skip $key"
               failures=1
             fi
           done <<< "$critical_lines"
 
+          #─────────────────────────────────────────
+          # 3) Sortie
+          #─────────────────────────────────────────
           if [ "$failures" -ne 0 ]; then
             echo
-            echo "❌  Unresolved CRITICAL findings detected."
-            echo "💡  To waive a finding, add a PR comment line like:"
-            echo "    /kube-score skip <apiVersion>/<Kind> <name>"
-            echo "    e.g.  /kube-score skip apps/v1/Deployment synapsets-web"
+            echo "❌  Des findings CRITICAL restent non résolus."
             exit 1
           fi
 
-          echo "✅  All CRITICAL findings fixed or explicitly skipped"
-
+          echo "✅  Tous les findings CRITICAL sont corrigés ou explicitement skip."
