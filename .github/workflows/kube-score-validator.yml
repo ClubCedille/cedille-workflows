@@ -91,22 +91,27 @@ jobs:
             | .[]'
           > /tmp/kskip.list || true
 
-      - name: Validate kube-score results
+      - name: Validate kube‑score results
         shell: bash
         run: |
           sk=$(sed -E 's%^/kube-score skip %%' /tmp/kskip.list | sort -u)
           echo "Skip list detected:"; printf '  - %s\n' $sk || true
           echo "----------------------------------------"
 
-          # Extract CRITICAL objects from kube-score CI output
-          crit=$(sed -nE 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\2 \1/p' /tmp/kube-score.ci | sort -u)
-
           failures=0
-          for obj in $crit; do
-            if grep -Fxq "$obj" <<< "$sk"; then
-              echo "⏭  $obj  (skipped)"
+
+          grep '^\[CRITICAL\]' /tmp/kube-score.ci |
+          while IFS= read -r line; do
+            # line format: [CRITICAL] <name> <apiVersion/Kind>: <message>
+            # → transform into key "apiVersion/Kind name" to compare with skip list
+            name=$(echo "$line" | awk '{print $2}')
+            kind=$(echo "$line" | awk '{print $3}')
+            key="$kind $name"                       # e.g. apps/v1/StatefulSet mysql
+
+            if grep -Fxq "$key" <<< "$sk"; then
+              echo "⏭  $key (skipped)"
             else
-              echo "::error::$obj failed kube‑score"
+              echo "::error::$line"                 # full error with message
               failures=1
             fi
           done
@@ -114,7 +119,7 @@ jobs:
           if [ "$failures" -ne 0 ]; then
             echo
             echo "❌  Unresolved CRITICAL findings detected."
-            echo "💡  To waive a specific object, add a PR comment line like:"
+            echo "💡  To waive a finding, add a PR comment line like:"
             echo "    /kube-score skip <apiVersion>/<Kind> <name>"
             echo "    e.g.  /kube-score skip apps/v1/Deployment synapsets-web"
             exit 1
