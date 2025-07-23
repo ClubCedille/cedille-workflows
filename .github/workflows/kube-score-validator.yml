@@ -108,7 +108,7 @@ jobs:
 
           if [ "$failures" -ne 0 ]; then
             echo
-            echo "❌  Des findings CRITICAL restent non résolus."
+            echo "❌  des findings CRITICAL sont encore présents."
             exit 1
           fi
 
