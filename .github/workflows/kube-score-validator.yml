@@ -49,13 +49,8 @@ jobs:
             dir="$(dirname "$kustom")"
             rel="${dir#./}"
 
-            if [[ $rel == apps/* ]]; then
-              app_root=$(echo "$rel" | cut -d/ -f1-2)
-            else
-              app_root=${rel%%/*}
-            fi
-
-            if grep -Fxq "$app_root" <<<"$to_rebuild"; then
+            root_key=$(echo "$rel" | cut -d/ -f1-2)
+            if grep -Fxq "$root_key" <<<"$to_rebuild"; then
               name="${rel//\//_}.yaml"
               echo "▶ building $name"
 
