@@ -6,6 +6,9 @@ on:
       GIT_AUTH_TOKEN:
         required: false
         description: 'PAT to publish image'
+      GITHUB_TOKEN:
+        required: false
+        description: ''
     inputs:
       container-name:
         required: true
