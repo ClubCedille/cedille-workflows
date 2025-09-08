@@ -60,5 +60,5 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache,mode=max
           secrets: |
-            GIT_AUTH_TOKEN = ${{ inputs.git-auth-token }}
+            GIT_AUTH_TOKEN = ${{ secrets.GIT_AUTH_TOKEN }}
         continue-on-error: true
