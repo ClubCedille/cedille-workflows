@@ -66,6 +66,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache,mode=max
-          secrets:
-            GIT_AUTH_TOKEN: "${{ secrets.GIT_AUTH_TOKEN }}"
+          secrets: |
+            GIT_AUTH_TOKEN = ${{ secrets.GIT_AUTH_TOKEN }}
         continue-on-error: true
