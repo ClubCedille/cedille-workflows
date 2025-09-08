@@ -6,6 +6,9 @@ on:
       GIT_AUTH_TOKEN:
         required: false
         description: 'PAT to publish image'
+      LOGIN_TOKEN:
+        required: false
+        description: ''
     inputs:
       container-name:
         required: true
@@ -40,7 +43,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.LOGIN_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
