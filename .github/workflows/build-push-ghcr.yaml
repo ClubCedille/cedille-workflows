@@ -2,6 +2,10 @@ name: Reusable workflow to build and push docker container to github container r
 
 on:
   workflow_call:
+    secrets:
+      GIT_AUTH_TOKEN:
+        required: false
+        description: 'PAT to publish image'
     inputs:
       container-name:
         required: true
@@ -14,9 +18,6 @@ on:
         required: false
         type: string
         default: 'Dockerfile'
-      git-auth-token:
-        required: false
-        type: string
       branch:
         type: string
         default: 'main'
