@@ -14,10 +14,10 @@ on:
         required: false
         type: string
         default: 'Dockerfile'
-      token:
-        required: false
-        type: string
-        default: ${{ secrets.GITHUB_TOKEN }}
+      # token:
+      #   required: false
+      #   type: string
+      #   default: ${{ secrets.GITHUB_TOKEN }}
       branch:
         type: string
         default: 'main'
@@ -37,7 +37,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ input.token }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
