@@ -14,10 +14,10 @@ on:
         required: false
         type: string
         default: 'Dockerfile'
-      registry:
+      token:
         required: false
         type: string
-        default: 'ghcr.io/clubcedille'
+        default: ${{ secrets.GITHUB_TOKEN }}
       branch:
         type: string
         default: 'main'
@@ -37,7 +37,7 @@ jobs:
         with:
           registry: ${{ inputs.registry }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ inputs.token }}
 
       - name: Extract Docker metadata
         id: meta
@@ -49,7 +49,7 @@ jobs:
             type=sha
             type=raw,value=${{ inputs.branch }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-        
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -60,4 +60,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=registry,ref=${{ inputs.registry }}/${{ inputs.container-name }}:buildcache
           cache-to: type=registry,ref=${{ inputs.registry }}/${{ inputs.container-name }}:buildcache,mode=max
+          secrets: |
+            ${{ inputs.token }}
         continue-on-error: true
