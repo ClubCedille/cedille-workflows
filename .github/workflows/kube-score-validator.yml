@@ -1,5 +1,4 @@
 name: kube-score validator workflow
-# Works only with pull request triggers
 on:
   workflow_call:
 
@@ -9,6 +8,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - uses: azure/setup-kubectl@v4
         id: install-kubectl
 
@@ -22,6 +22,8 @@ jobs:
         uses: tj-actions/changed-files@cf79a64fed8a943fb1073260883d08fe0dfb4e56
 
       - name: Build overlays for changed kustomizations
+        id: build
+        shell: bash
         run: |
           set -euo pipefail
           out_dir="out/kustomize"
@@ -29,35 +31,52 @@ jobs:
 
           changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
 
-          to_rebuild=$(echo "$changed_files" | tr ' ' '\n' |
-                      grep -E '^(apps|bases|system|common)/' |
-                      cut -d/ -f1-2 | sed 's:/$::' | sort -u)
+          # Tolerate "no matches" under -euo pipefail
+          to_rebuild=$(
+            { printf '%s\n' "$changed_files" | tr ' ' '\n' | grep -E '^(apps|bases|system|common)/' || true; } |
+            cut -d/ -f1-2 | sed 's:/$::' | sort -u
+          )
 
-          echo "Apps to rebuild:"; printf '  %s\n' $to_rebuild
+          echo "Apps to rebuild:"
+          if [ -n "${to_rebuild:-}" ]; then
+            printf '  %s\n' $to_rebuild
+          else
+            echo "  (none)"
+          fi
           echo "-----------------------------------------"
 
+          # Discover kustomization roots present in the repo
           roots=()
           for d in apps bases system common; do
             [ -d "$d" ] && roots+=("./$d")
           done
-          [ "${#roots[@]}" -eq 0 ] && { echo "No kustomization roots found."; exit 0; }
+          [ "${#roots[@]}" -eq 0 ] && {
+            echo "No kustomization roots found."
+            echo "built_any=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
 
+          # Early exit if nothing to rebuild
+          if [ -z "${to_rebuild:-}" ]; then
+            echo "Nothing to rebuild."
+            echo "built_any=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Build each selected kustomization
           find "${roots[@]}" \
-              -type f \( -name kustomization.yaml -o -name kustomization.yml \) \
-              -not -path '*/base/*' -print0 |
+            -type f \( -name kustomization.yaml -o -name kustomization.yml \) \
+            -not -path '*/base/*' -print0 |
           while IFS= read -r -d '' kustom; do
             dir="$(dirname "$kustom")"
             rel="${dir#./}"
-
             root_key=$(echo "$rel" | cut -d/ -f1-2)
             if grep -Fxq "$root_key" <<<"$to_rebuild"; then
               name="${rel//\//_}.yaml"
               echo "▶ building $name"
-
-              # Allow refs that climb out of the kustomisation dir (needed for nextcloud)
               if kubectl kustomize --enable-helm \
-                                  --load-restrictor LoadRestrictionsNone \
-                                  "$dir" > "$out_dir/$name"; then
+                                   --load-restrictor LoadRestrictionsNone \
+                                   "$dir" > "$out_dir/$name"; then
                 echo "✓ $name built"
               else
                 echo "⚠️  $rel failed to build; skipping"
@@ -71,13 +90,32 @@ jobs:
           echo "---- Resulting manifests ----"
           ls -l "$out_dir" || true
 
-      - name: kube‑score check
+          # Output flag to gate follow-up steps
+          shopt -s nullglob
+          files=( "$out_dir"/*.yaml )
+          if [ ${#files[@]} -gt 0 ]; then
+            echo "built_any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "built_any=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: kube-score check
         id: score
+        if: steps.build.outputs.built_any == 'true'
+        shell: bash
         run: |
-          kube-score score --output-format ci ./out/kustomize/*.yaml | tee /tmp/kube-score.ci
+          set -euo pipefail
+          shopt -s nullglob
+          files=( ./out/kustomize/*.yaml )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No manifests to score."
+            exit 0
+          fi
+          kube-score score --output-format ci "${files[@]}" | tee /tmp/kube-score.ci
 
       - name: Collect /kube-score skip directives
         id: skips
+        if: steps.build.outputs.built_any == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,24 +132,30 @@ jobs:
           echo "Skip directives found:"
           cat /tmp/kskip.list || echo "(none)"
 
-      - name: Validate kube‑score results
+      - name: Validate kube-score results
+        if: steps.build.outputs.built_any == 'true'
         shell: bash
         run: |
-          sk=$(sed -E 's%^/kube-score skip %%; s/\r$//' /tmp/kskip.list | sort -u)
+          set -euo pipefail
 
+          # If kube-score didn't run or produced no output, exit cleanly
+          if [ ! -f /tmp/kube-score.ci ]; then
+            echo "No kube-score output; nothing to validate."
+            exit 0
+          fi
+
+          sk=$(sed -E 's%^/kube-score skip %%; s/\r$//' /tmp/kskip.list 2>/dev/null | sort -u || true)
           critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
           failures=0
 
           while IFS= read -r line; do
             [ -z "$line" ] && continue
-
             key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
-
             if grep -Fxq "$key" <<< "$sk"; then
               echo "⏭  $key (skipped)"
             else
               echo "::error::$line"
-              echo "↳  Pour ignorer : /kube-score skip $key"
+              echo "↳  Pour ignorer : /kube-score skip $key"
               failures=1
             fi
           done <<< "$critical_lines"
