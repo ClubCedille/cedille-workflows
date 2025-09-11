@@ -2,6 +2,10 @@ name: Reusable workflow to build and push docker container to github container r
 
 on:
   workflow_call:
+    secrets:
+      GIT_AUTH_TOKEN:
+        required: false
+        description: 'PAT to publish image'
     inputs:
       container-name:
         required: true
@@ -36,7 +40,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GIT_AUTH_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
@@ -57,6 +61,8 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          secrets: |
+            GIT_AUTH_TOKEN = ${{ secrets.GIT_AUTH_TOKEN }}
         continue-on-error: true
