@@ -6,7 +6,6 @@ on:
       GIT_AUTH_TOKEN:
         required: false
         description: 'PAT to publish image'
-        default: {{ secrets.GITHUB_TOKEN }}
     inputs:
       container-name:
         required: true
