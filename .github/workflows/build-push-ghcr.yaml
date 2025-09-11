@@ -4,11 +4,9 @@ on:
   workflow_call:
     secrets:
       GIT_AUTH_TOKEN:
-        required: true
-        description: 'PAT to publish image'
-      LOGIN_TOKEN:
         required: false
-        description: ''
+        description: 'PAT to publish image'
+        default: {{ secrets.GITHUB_TOKEN }}
     inputs:
       container-name:
         required: true
@@ -43,7 +41,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.LOGIN_TOKEN }}
+          password: ${{ secrets.GIT_AUTH_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
