@@ -102,6 +102,7 @@ jobs:
       - name: kube-score check
         id: score
         if: steps.build.outputs.built_any == 'true'
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -109,15 +110,16 @@ jobs:
           files=( ./out/kustomize/*.yaml )
           if [ ${#files[@]} -eq 0 ]; then
             echo "No manifests to score."
+            : > /tmp/kube-score.ci
             exit 0
           fi
 
+          : > /tmp/kube-score.ci
           set +e
           kube-score score --output-format ci "${files[@]}" | tee /tmp/kube-score.ci
           ks_status=$?
           set -e
-          echo "kube-score exited with: $ks_status (ignored here; validation happens next)"
-
+          echo "kube-score exited with code: $ks_status"
 
       - name: Collect /kube-score skip directives
         id: skips
@@ -143,12 +145,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          # If kube-score didn't run or produced no output, exit cleanly
-          if [ ! -f /tmp/kube-score.ci ]; then
-            echo "No kube-score output; nothing to validate."
-            exit 0
-          fi
+          [ -f /tmp/kube-score.ci ] || { echo "No kube-score output; nothing to validate."; exit 0; }
 
           sk=$(sed -E 's%^/kube-score skip %%; s/\r$//' /tmp/kskip.list 2>/dev/null | sort -u || true)
           critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
@@ -173,3 +170,4 @@ jobs:
           fi
 
           echo "✅  Tous les findings CRITICAL sont corrigés ou explicitement skip."
+
