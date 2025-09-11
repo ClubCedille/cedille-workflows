@@ -111,7 +111,13 @@ jobs:
             echo "No manifests to score."
             exit 0
           fi
+
+          set +e
           kube-score score --output-format ci "${files[@]}" | tee /tmp/kube-score.ci
+          ks_status=$?
+          set -e
+          echo "kube-score exited with: $ks_status (ignored here; validation happens next)"
+
 
       - name: Collect /kube-score skip directives
         id: skips
