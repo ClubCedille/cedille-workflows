@@ -46,6 +46,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha
+            type=ref,event=pr
             type=raw,value=${{ inputs.branch }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
         
