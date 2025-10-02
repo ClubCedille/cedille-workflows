@@ -17,6 +17,12 @@ on:
       branch:
         type: string
         default: 'main'
+      pr-head-sha:
+        required: false
+        type: string
+      pr-head-ref:
+        required: false
+        type: string
 
 env:
   REGISTRY: ghcr.io/clubcedille
@@ -25,8 +31,11 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Out Repo
-        uses: actions/checkout@v4
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.pr-head-ref || inputs.pr-head-sha || '' }}
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -43,14 +52,16 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ inputs.container-name }}
+          context: git
           tags: |
             type=ref,event=branch
             type=sha
-            type=sha,format=long
+            type=sha,format=long,prefix=
             type=ref,event=pr
+            type=raw,value=${{ inputs.pr-head-sha }},enable=${{ inputs.pr-head-sha != '' }}
             type=raw,value=${{ inputs.branch }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-        
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
