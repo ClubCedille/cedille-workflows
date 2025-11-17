@@ -65,4 +65,3 @@ jobs:
           cache-to: type=gha,mode=max
           secrets: |
             GIT_AUTH_TOKEN = ${{ secrets.GIT_AUTH_TOKEN }}
-        continue-on-error: true
