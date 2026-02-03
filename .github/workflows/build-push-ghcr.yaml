@@ -72,4 +72,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ inputs.container-name }}:buildcache,mode=max
-        continue-on-error: true
+        continue-on-error: false
