@@ -55,11 +55,12 @@ jobs:
 
       - name: Run TFLint
         if: steps.check_files.outputs.result == 'true'
+        env:
+          CONFIG_FILE_PATH: ${{ github.event.inputs.config-file-path }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
-          if [ -n "${{ github.event.inputs.config-file-path }}" ]; then
-            tflint --recursive --config \
-            "${{ github.workspace }}/
-            ${{ github.event.inputs.config-file-path }}"
+          if [ -n "$CONFIG_FILE_PATH" ]; then
+            tflint --recursive --config "$WORKSPACE/$CONFIG_FILE_PATH"
           else
-            tflint --recursive --config "${{ github.workspace }}/cedille-workflows/.tflint.hcl"
+            tflint --recursive --config "$WORKSPACE/cedille-workflows/.tflint.hcl"
           fi
