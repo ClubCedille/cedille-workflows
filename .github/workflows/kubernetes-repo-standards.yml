@@ -10,11 +10,11 @@ jobs:
 
   kubeconform-check:
     uses:
-      clubcedille/cedille-workflows/.github/workflows/kubeconform.yml@feat/kubeconform-pluto-validation
+      clubcedille/cedille-workflows/.github/workflows/kubeconform.yml@master
 
   deprecated-apis-check:
     uses:
-      clubcedille/cedille-workflows/.github/workflows/pluto-deprecated-apis.yml@feat/kubeconform-pluto-validation
+      clubcedille/cedille-workflows/.github/workflows/pluto-deprecated-apis.yml@master
 
   yaml-check:
     uses:
