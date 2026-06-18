@@ -35,18 +35,18 @@ jobs:
         id: linkconfig
         run: |
           if [ -z "${{ inputs.md-link-config-file-path }}" ]; then
-            echo "::set-output name=link_config_path::cedille-workflows/.mlc_config.json"
+            echo "link_config_path=cedille-workflows/.mlc_config.json" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=link_config_path::${{ inputs.md-link-config-file-path }}"
+            echo "link_config_path=${{ inputs.md-link-config-file-path }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Determine markdown lint config file
         id: lintconfig
         run: |
           if [ -z "${{ inputs.md-lint-config-file-path }}" ]; then
-            echo "::set-output name=lint_config_path::cedille-workflows/.markdownlint.json"
+            echo "lint_config_path=cedille-workflows/.markdownlint.json" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=lint_config_path::${{ inputs.md-lint-config-file-path }}"
+            echo "lint_config_path=${{ inputs.md-lint-config-file-path }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run markdown lint
