@@ -48,13 +48,15 @@ jobs:
       - name: Check for Terraform files
         id: check_files
         run: |
-          if [ -z "$(find . -name '*.tf')" ]; then
+          if find . -name '*.tf' -not -path './.terraform/*' | grep -q .; then
+            echo "has_tf=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_tf=false" >> "$GITHUB_OUTPUT"
             echo "No Terraform files found."
-            exit 0
           fi
 
       - name: Run TFLint
-        if: steps.check_files.outputs.result == 'true'
+        if: steps.check_files.outputs.has_tf == 'true'
         env:
           CONFIG_FILE_PATH: ${{ github.event.inputs.config-file-path }}
           WORKSPACE: ${{ github.workspace }}
