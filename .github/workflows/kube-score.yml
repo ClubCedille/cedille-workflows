@@ -1,0 +1,34 @@
+name: kube-score workflow
+
+on:
+  workflow_call:
+
+jobs:
+  kube-score:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+        id: install-kubectl
+
+      - name: Build overlays and run kube-score
+        run: |
+          out_dir="out/kustomize"
+          mkdir -p "$out_dir"
+
+          for root in apps bases system common; do
+            [ -d "$root" ] || continue
+            find "$root" -type f \( -name kustomization.yaml -o -name kustomization.yml \)\
+              -not -path '*/base/*' -print0
+          done | while IFS= read -r -d '' kustom; do
+              dir="$(dirname "$kustom")"
+              rel="${dir#./}"
+              name="${rel//\//_}.yaml"
+              kubectl kustomize --enable-helm "$dir" > "$out_dir/$name"
+          done
+      - name: kube-score check (Kustomize)
+        uses: piraces/kube-score-ga@v0.1.3
+        with:
+          manifests-folders: './out/kustomize/*.yaml'
