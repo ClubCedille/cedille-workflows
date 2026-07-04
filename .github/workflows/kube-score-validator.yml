@@ -137,8 +137,55 @@ jobs:
             | .[]
           ' > /tmp/kskip.list || true
 
+          gh pr view "$PR_NUMBER" --json body,comments --jq '
+            ([.body] + [.comments[].body])
+            | map(split("\n")[])
+            | map(select(startswith("/kube-score probe-skip ")))
+            | unique
+            | .[]
+          ' > /tmp/kprobe-skip.list || true
+
           echo "Skip directives found:"
           cat /tmp/kskip.list || echo "(none)"
+          echo "Probe skip directives found:"
+          cat /tmp/kprobe-skip.list || echo "(none)"
+
+      - name: Validate required probes
+        if: steps.build.outputs.built_any == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -f /tmp/kube-score.ci ] || { echo "No kube-score output; nothing to validate."; exit 0; }
+
+          probe_skips=$(sed -E 's%^/kube-score probe-skip %%; s/\r$//' /tmp/kprobe-skip.list 2>/dev/null | sort -u || true)
+          probe_lines=$(
+            grep '^\[CRITICAL\]' /tmp/kube-score.ci |
+              grep -Ei 'missing a readinessProbe|same readiness and liveness probe|readiness probe|liveness probe|startup probe|pod-probes' ||
+              true
+          )
+          failures=0
+
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
+            if grep -Fxq "$key" <<< "$probe_skips"; then
+              echo "⏭  $key (probe skipped)"
+            else
+              echo "::error::$line"
+              echo "↳  Ce workload semble nécessiter des probes."
+              echo "↳  Ajoutez readinessProbe/livenessProbe/startupProbe si applicable."
+              echo "↳  Pour ignorer explicitement : /kube-score probe-skip $key"
+              failures=1
+            fi
+          done <<< "$probe_lines"
+
+          if [ "$failures" -ne 0 ]; then
+            echo
+            echo "❌  des probes requises sont manquantes ou mal configurées."
+            exit 1
+          fi
+
+          echo "✅  Aucun finding critique lié aux probes."
 
       - name: Validate kube-score results
         if: steps.build.outputs.built_any == 'true'
@@ -170,4 +217,3 @@ jobs:
           fi
 
           echo "✅  Tous les findings CRITICAL sont corrigés ou explicitement skip."
-
