@@ -31,10 +31,27 @@ jobs:
 
           changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
 
+          changed_root_for() {
+            local path="$1"
+            IFS=/ read -r top second third fourth _ <<< "$path"
+
+            case "$path" in
+              apps/clubs/*/*/*)
+                printf '%s/%s/%s/%s\n' "$top" "$second" "$third" "$fourth"
+                ;;
+              apps/*/*|bases/*/*|system/*/*|common/*/*)
+                printf '%s/%s\n' "$top" "$second"
+                ;;
+            esac
+          }
+
           # Tolerate "no matches" under -euo pipefail
           to_rebuild=$(
             { printf '%s\n' "$changed_files" | tr ' ' '\n' | grep -E '^(apps|bases|system|common)/' || true; } |
-            cut -d/ -f1-2 | sed 's:/$::' | sort -u
+            while IFS= read -r changed_file; do
+              changed_root_for "$changed_file"
+            done |
+            sed 's:/$::' | sort -u
           )
 
           echo "Apps to rebuild:"
@@ -70,8 +87,16 @@ jobs:
           while IFS= read -r -d '' kustom; do
             dir="$(dirname "$kustom")"
             rel="${dir#./}"
-            root_key=$(echo "$rel" | cut -d/ -f1-2)
-            if grep -Fxq "$root_key" <<<"$to_rebuild"; then
+            should_build=false
+            while IFS= read -r root_key; do
+              [ -z "$root_key" ] && continue
+              if [[ "$rel" == "$root_key" || "$rel" == "$root_key"/* ]]; then
+                should_build=true
+                break
+              fi
+            done <<< "$to_rebuild"
+
+            if [ "$should_build" = true ]; then
               name="${rel//\//_}.yaml"
               echo "▶ building $name"
               if kubectl kustomize --enable-helm \
