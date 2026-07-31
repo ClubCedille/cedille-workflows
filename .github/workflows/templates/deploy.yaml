@@ -1,0 +1,34 @@
+name: Deploy template
+
+on:
+  workflow_call:
+    inputs:
+      container-name:
+        required: true
+        type: string
+      context:
+        required: false
+        type: string
+        default: '.'
+      file:
+        required: false
+        type: string
+        default: 'Dockerfile'
+      branch:
+        required: false
+        type: string
+        default: 'main'
+    secrets:
+      GIT_AUTH_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    uses: clubcedille/cedille-workflows/.github/workflows/external-build-push-ghcr.yaml@master
+    with:
+      container-name: ${{ inputs.container-name }}
+      context: ${{ inputs.context }}
+      file: ${{ inputs.file }}
+      branch: ${{ inputs.branch }}
+    secrets:
+      GIT_AUTH_TOKEN: ${{ secrets.GIT_AUTH_TOKEN }}

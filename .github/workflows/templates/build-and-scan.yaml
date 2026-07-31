@@ -1,0 +1,63 @@
+name: Build and scan template
+
+on:
+  workflow_call:
+    inputs:
+      project-key:
+        required: true
+        type: string
+      project-name:
+        required: false
+        type: string
+        default: ''
+      host-url:
+        required: false
+        type: string
+        default: 'https://sonarqube.etsmtl.club'
+      build-command:
+        required: false
+        type: string
+        default: ''
+      run-yaml-lint:
+        required: false
+        type: boolean
+        default: true
+      run-markdown-lint:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_ROOT_CERT:
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build the app
+        if: ${{ inputs.build-command != '' }}
+        run: ${{ inputs.build-command }}
+
+  yaml-lint:
+    if: ${{ inputs.run-yaml-lint }}
+    uses: clubcedille/cedille-workflows/.github/workflows/yaml-lint.yml@master
+
+  markdown-lint:
+    if: ${{ inputs.run-markdown-lint }}
+    uses: clubcedille/cedille-workflows/.github/workflows/markdown-lint.yml@master
+
+  sonarqube:
+    needs: build
+    uses: clubcedille/cedille-workflows/.github/workflows/sonarqube-scan.yaml@master
+    with:
+      project-key: ${{ inputs.project-key }}
+      project-name: ${{ inputs.project-name }}
+      host-url: ${{ inputs.host-url }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
