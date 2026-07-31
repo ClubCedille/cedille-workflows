@@ -1,0 +1,56 @@
+name: Reusable workflow to run SonarQube analysis
+
+on:
+  workflow_call:
+    inputs:
+      project-key:
+        required: true
+        type: string
+      project-name:
+        required: false
+        type: string
+        default: ''
+      host-url:
+        required: false
+        type: string
+        default: 'https://sonarqube.etsmtl.club'
+      args:
+        required: false
+        type: string
+        default: ''
+      project-base-dir:
+        required: false
+        type: string
+        default: '.'
+      skip-checkout:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_ROOT_CERT:
+        required: false
+
+jobs:
+  sonarqube-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        if: ${{ !inputs.skip-checkout }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_HOST_URL: ${{ inputs.host-url }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
+        with:
+          projectBaseDir: ${{ inputs.project-base-dir }}
+          args: >-
+            -Dsonar.projectKey=${{ inputs.project-key }}
+            ${{ inputs.project-name != '' && format('-Dsonar.projectName={0}', inputs.project-name) || '' }}
+            ${{ inputs.args }}
