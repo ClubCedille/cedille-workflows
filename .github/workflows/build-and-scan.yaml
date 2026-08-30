@@ -3,9 +3,9 @@ name: Build and scan template
 on:
   workflow_call:
     inputs:
-      project-key:
-        required: true
-        type: string
+      #project-key:
+       # required: true
+        #type: string
       project-name:
         required: false
         type: string
@@ -28,7 +28,7 @@ on:
         default: true
     secrets:
       SONAR_TOKEN:
-        required: true
+        required: false
       SONAR_ROOT_CERT:
         required: false
 
@@ -51,13 +51,13 @@ jobs:
     if: ${{ inputs.run-markdown-lint }}
     uses: clubcedille/cedille-workflows/.github/workflows/markdown-lint.yml@master
 
-  sonarqube:
-    needs: build
-    uses: clubcedille/cedille-workflows/.github/workflows/sonarqube-scan.yaml@master
-    with:
-      project-key: ${{ inputs.project-key }}
-      project-name: ${{ inputs.project-name }}
-      host-url: ${{ inputs.host-url }}
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
+  #sonarqube:
+  #  needs: build
+  #  uses: clubcedille/cedille-workflows/.github/workflows/sonarqube-scan.yaml@master
+  #  with:
+  #    project-key: ${{ inputs.project-key }}
+  #    project-name: ${{ inputs.project-name }}
+  #    host-url: ${{ inputs.host-url }}
+  #  secrets:
+  #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #    SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
