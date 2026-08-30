@@ -3,9 +3,9 @@ name: Build and scan template
 on:
   workflow_call:
     inputs:
-      #project-key:
-       # required: true
-        #type: string
+      project-key:
+        required: true
+        type: string
       project-name:
         required: false
         type: string
