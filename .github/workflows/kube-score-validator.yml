@@ -103,6 +103,16 @@ jobs:
                                    --load-restrictor LoadRestrictionsNone \
                                    "$dir" > "$out_dir/$name"; then
                 echo "✓ $name built"
+                # Mark roots that render resources from an upstream Helm
+                # chart (helmCharts: anywhere under this kustomization tree,
+                # including local bases) — the club doesn't control those
+                # templates, so a subset of kube-score checks is downgraded
+                # to non-blocking for them. See "Validate kube-score
+                # results" below and k8s-shared/README.md#politique-kube-score.
+                if find "$dir" -type f \( -name kustomization.yaml -o -name kustomization.yml \) \
+                     -print0 | xargs -0 grep -lq '^helmCharts:' 2>/dev/null; then
+                  echo "$name" >> "$out_dir/.helm-sourced"
+                fi
               else
                 echo "⚠️  $rel failed to build; skipping"
                 rm -f "$out_dir/$name"
@@ -114,6 +124,8 @@ jobs:
 
           echo "---- Resulting manifests ----"
           ls -l "$out_dir" || true
+          echo "---- Helm-sourced roots (subset of checks non-blocking) ----"
+          cat "$out_dir/.helm-sourced" 2>/dev/null || echo "  (none)"
 
           # Output flag to gate follow-up steps
           shopt -s nullglob
@@ -139,9 +151,16 @@ jobs:
             exit 0
           fi
 
+          # Score each manifest individually (rather than all at once) so
+          # every finding line can be tagged with its source file below —
+          # that's what lets the next step know which findings came from a
+          # helm-sourced root and are eligible for the non-blocking tier.
           : > /tmp/kube-score.ci
           set +e
-          kube-score score --output-format ci "${files[@]}" | tee /tmp/kube-score.ci
+          for f in "${files[@]}"; do
+            name="$(basename "$f")"
+            kube-score score --output-format ci "$f" | sed "s/^/[$name] /" | tee -a /tmp/kube-score.ci
+          done
           ks_status=$?
           set -e
           echo "kube-score exited with code: $ks_status"
@@ -184,15 +203,18 @@ jobs:
 
           probe_skips=$(sed -E 's%^/kube-score probe-skip %%; s/\r$//' /tmp/kprobe-skip.list 2>/dev/null | sort -u || true)
           probe_lines=$(
-            grep '^\[CRITICAL\]' /tmp/kube-score.ci |
+            grep -E '^\[[^]]+\] \[CRITICAL\]' /tmp/kube-score.ci |
               grep -Ei 'missing a readinessProbe|same readiness and liveness probe|readiness probe|liveness probe|startup probe|pod-probes' ||
               true
           )
           failures=0
 
+          # Probes are always blocking, including on helm-sourced resources
+          # (see "Checks à garder bloquants" in the kube-score policy) — no
+          # non-blocking downgrade here, only the existing probe-skip escape.
           while IFS= read -r line; do
             [ -z "$line" ] && continue
-            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
+            key=$(sed -E 's/^\[[^]]+\] \[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
             if grep -Fxq "$key" <<< "$probe_skips"; then
               echo "⏭  $key (probe skipped)"
             else
@@ -219,15 +241,44 @@ jobs:
           set -euo pipefail
           [ -f /tmp/kube-score.ci ] || { echo "No kube-score output; nothing to validate."; exit 0; }
 
+          # Checks that stay blocking everywhere, even on helm-sourced
+          # resources: privileged containers, missing probes (handled in the
+          # previous step), and floating :latest-style tags are excluded from
+          # this list on purpose.
+          #
+          # Checks downgraded to non-blocking (warning only) when the finding
+          # comes from a manifest built out of a root that uses helmCharts: —
+          # the club doesn't control those templates. Kept in sync with
+          # k8s-shared/README.md#politique-kube-score.
+          downgradable="container-resources container-ephemeral-storage-request-and-limit container-security-context-user-group-id pod-networkpolicy container-image-tag container-image-pull-policy"
+
+          helm_sourced_files=""
+          if [ -f ./out/kustomize/.helm-sourced ]; then
+            helm_sourced_files=$(cat ./out/kustomize/.helm-sourced)
+          fi
+
           sk=$(sed -E 's%^/kube-score skip %%; s/\r$//' /tmp/kskip.list 2>/dev/null | sort -u || true)
-          critical_lines=$(grep '^\[CRITICAL\]' /tmp/kube-score.ci || true)
+          critical_lines=$(grep -E '^\[[^]]+\] \[CRITICAL\]' /tmp/kube-score.ci || true)
           failures=0
+          warnings=0
 
           while IFS= read -r line; do
             [ -z "$line" ] && continue
-            key=$(sed -E 's/^\[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
+            src_file=$(sed -E 's/^\[([^]]+)\].*/\1/' <<< "$line")
+            key=$(sed -E 's/^\[[^]]+\] \[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
+            check_id=$(awk '{print $2}' <<< "$key")
+
+            is_helm_sourced=false
+            grep -Fxq "$src_file" <<< "$helm_sourced_files" && is_helm_sourced=true
+            is_downgradable=false
+            grep -Fqw "$check_id" <<< "$downgradable" && is_downgradable=true
+
             if grep -Fxq "$key" <<< "$sk"; then
               echo "⏭  $key (skipped)"
+            elif [ "$is_helm_sourced" = true ] && [ "$is_downgradable" = true ]; then
+              echo "::warning::$line"
+              echo "↳  Ressource issue d'un helmChart upstream, check non-bloquant ($check_id)."
+              warnings=$((warnings + 1))
             else
               echo "::error::$line"
               echo "↳  Pour ignorer : /kube-score skip $key"
@@ -235,10 +286,15 @@ jobs:
             fi
           done <<< "$critical_lines"
 
+          if [ "$warnings" -gt 0 ]; then
+            echo
+            echo "⚠️  $warnings finding(s) CRITICAL non-bloquant(s) (helm chart upstream) — voir les ::warning:: ci-dessus."
+          fi
+
           if [ "$failures" -ne 0 ]; then
             echo
-            echo "❌  des findings CRITICAL sont encore présents."
+            echo "❌  des findings CRITICAL bloquants sont encore présents."
             exit 1
           fi
 
-          echo "✅  Tous les findings CRITICAL sont corrigés ou explicitement skip."
+          echo "✅  Tous les findings CRITICAL bloquants sont corrigés ou explicitement skip."
