@@ -1,0 +1,60 @@
+name: Tofu Plan Comment
+description: >-
+  Posts or updates a pull request comment summarizing the resource counts of a
+  tofu plan. Requires the caller's workflow to grant the GITHUB_TOKEN the
+  `pull-requests: write` permission.
+
+inputs:
+  plan-path:
+    description: >-
+      Path (relative to the workspace root) to the tofu plan text output,
+      e.g. produced by `tofu plan -no-color -out=plan.tfplan` followed by
+      `tofu show -no-color plan.tfplan > plan.txt`.
+    required: true
+  module:
+    description: Name of the module, used in the comment title.
+    required: false
+    default: terraform
+  marker:
+    description: >-
+      Unique token embedded in the comment so re-runs update the same comment
+      instead of creating a new one. Defaults to `tfplan-<module>`.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Post plan summary comment
+      uses: actions/github-script@v7
+      env:
+        MODULE: ${{ inputs.module }}
+        MARKER: ${{ inputs.marker }}
+        PLAN_PATH: ${{ inputs.plan-path }}
+      with:
+        script: |
+          const fs = require('fs')
+          const plan = fs.readFileSync(process.env.PLAN_PATH, 'utf8')
+          const m = plan.match(/Plan:\s*(?:(\d+) to import,\s*)?(\d+) to add,\s*(\d+) to change,\s*(\d+) to destroy\./)
+          const n = (i, s = '') => m && m[i] ? m[i] : s
+          const add = n(2, plan.includes('No changes') ? '0' : '?')
+          const chg = n(3, '0')
+          const del = n(4, '0')
+          const imp = m ? m[1] : null
+          const module = process.env.MODULE
+          const marker = process.env.MARKER || `tfplan-${module}`
+          const body = `<!-- ${marker} -->\n## Tofu plan: \`${module}\`\n` +
+            `- ${add} to add\n- ${chg} to change\n- ${del} to destroy` +
+            (imp ? `\n- ${imp} to import` : '')
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+          })
+          const existing = comments.find(c => c.body.includes(`<!-- ${marker} -->`))
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body,
+            })
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body,
+            })
+          }
