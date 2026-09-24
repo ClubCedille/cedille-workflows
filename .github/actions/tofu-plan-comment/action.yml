@@ -20,6 +20,11 @@ inputs:
       Unique token embedded in the comment so re-runs update the same comment
       instead of creating a new one. Defaults to `tfplan-<module>`.
     required: false
+  artifact-name:
+    description: >-
+      If set, appends a link to the plan artifact uploaded under this name for
+      the current workflow run (e.g. `tfplan-authentik`).
+    required: false
 
 runs:
   using: composite
@@ -30,6 +35,7 @@ runs:
         MODULE: ${{ inputs.module }}
         MARKER: ${{ inputs.marker }}
         PLAN_PATH: ${{ inputs.plan-path }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
       with:
         script: |
           const fs = require('fs')
@@ -42,9 +48,19 @@ runs:
           const imp = m ? m[1] : null
           const module = process.env.MODULE
           const marker = process.env.MARKER || `tfplan-${module}`
-          const body = `<!-- ${marker} -->\n## Tofu plan: \`${module}\`\n` +
+          const artifactName = process.env.ARTIFACT_NAME
+          let body = `<!-- ${marker} -->\n## Tofu plan: \`${module}\`\n` +
             `- ${add} to add\n- ${chg} to change\n- ${del} to destroy` +
             (imp ? `\n- ${imp} to import` : '')
+          if (artifactName) {
+            const { data: run } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId,
+            })
+            const artifact = run.artifacts.find(a => a.name === artifactName)
+            if (artifact) {
+              body += `\n\n[Download \`${artifactName}\` plan](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id})`
+            }
+          }
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
           })
