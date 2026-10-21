@@ -155,11 +155,33 @@ jobs:
           # every finding line can be tagged with its source file below —
           # that's what lets the next step know which findings came from a
           # helm-sourced root and are eligible for the non-blocking tier.
+          command -v jq >/dev/null || { echo "::error::jq is required"; exit 1; }
+
+          # The `ci` output format does not contain the kube-score check ID,
+          # which the policy below needs to decide whether a finding is
+          # downgradable. Use the JSON output and render a CI-like line that
+          # includes the check ID in brackets after the colon.
           : > /tmp/kube-score.ci
           set +e
           for f in "${files[@]}"; do
             name="$(basename "$f")"
-            kube-score score --output-format ci "$f" | sed "s/^/[$name] /" | tee -a /tmp/kube-score.ci
+            json_tmp="$(mktemp)"
+            kube-score score --output-format json "$f" >"$json_tmp" 2>/dev/null
+            if [ ! -s "$json_tmp" ]; then
+              echo "::error::kube-score produced no JSON output for $name"
+              rm -f "$json_tmp"
+              exit 1
+            fi
+            jq -r --arg file "$name" '
+              .[] as $o
+              | $o.checks[]?
+              | select(.grade == 1 or .grade == 5)
+              | . as $c
+              | ($c.comments // [])[]
+              | "\($o.object_meta.name)\(if ($o.object_meta.namespace // "") != "" then "/\($o.object_meta.namespace)" else "" end)" as $obj
+              | "[\($file)] [\(if $c.grade == 1 then "CRITICAL" else "WARNING" end)] \($obj) \($o.type_meta.apiVersion)/\($o.type_meta.kind): [\($c.check.id)] \(.summary)"
+            ' "$json_tmp" | tee -a /tmp/kube-score.ci
+            rm -f "$json_tmp"
           done
           ks_status=$?
           set -e
@@ -204,7 +226,7 @@ jobs:
           probe_skips=$(sed -E 's%^/kube-score probe-skip %%; s/\r$//' /tmp/kprobe-skip.list 2>/dev/null | sort -u || true)
           probe_lines=$(
             grep -E '^\[[^]]+\] \[CRITICAL\]' /tmp/kube-score.ci |
-              grep -Ei 'missing a readinessProbe|same readiness and liveness probe|readiness probe|liveness probe|startup probe|pod-probes' ||
+              grep -E ': \[(pod-probes|pod-probes-identical)\] ' ||
               true
           )
           failures=0
@@ -266,7 +288,7 @@ jobs:
             [ -z "$line" ] && continue
             src_file=$(sed -E 's/^\[([^]]+)\].*/\1/' <<< "$line")
             key=$(sed -E 's/^\[[^]]+\] \[CRITICAL\] +([^ ]+) +([^:]+):.*/\1 \2/' <<< "$line" | tr -d '\r')
-            check_id=$(awk '{print $2}' <<< "$key")
+            check_id=$(sed -E 's/^\[[^]]+\] \[CRITICAL\] [^:]+: \[([^]]+)\].*/\1/' <<< "$line" | tr -d '\r')
 
             is_helm_sourced=false
             grep -Fxq "$src_file" <<< "$helm_sourced_files" && is_helm_sourced=true

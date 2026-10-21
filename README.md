@@ -10,8 +10,12 @@ various Github events, such as pushes to the repository, pull requests, etc.
 `kube-score-validator.yml` builds every changed kustomization root (`kubectl
 kustomize --enable-helm`) and runs `kube-score` on the result. Any
 `[CRITICAL]` finding fails the job unless it's explicitly skipped with a
-`/kube-score skip <object> <check>` (or `/kube-score probe-skip ...` for
-probe-related findings) PR comment.
+`/kube-score skip <object> <apiVersion>/<kind>` (or
+`/kube-score probe-skip ...` for probe-related findings) PR comment.
+
+The gate reads kube-score's JSON output (`--output-format json`) so each
+finding is matched to its `check_id`; the `ci` text format does not include
+the check ID and cannot be used to apply the downgrade list below.
 
 **Blocking checks** (all repos, all resources): missing liveness/readiness/
 startup probes, privileged containers, and any check not explicitly
