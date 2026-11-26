@@ -178,6 +178,7 @@ jobs:
               | select(.grade == 1 or .grade == 5)
               | . as $c
               | ($c.comments // [])[]
+              | select((.summary // "") | startswith("Skipped because ") | not)
               | "\($o.object_meta.name)\(if ($o.object_meta.namespace // "") != "" then "/\($o.object_meta.namespace)" else "" end)" as $obj
               | "[\($file)] [\(if $c.grade == 1 then "CRITICAL" else "WARNING" end)] \($obj) \($o.type_meta.apiVersion)/\($o.type_meta.kind): [\($c.check.id)] \(.summary)"
             ' "$json_tmp" | tee -a /tmp/kube-score.ci
